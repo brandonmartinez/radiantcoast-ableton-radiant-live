@@ -13,77 +13,100 @@
 // Number of I/O
 outlets = 1;
 
-// Global Variables to Expose
-var radiantLiveEnabled = true;
-
-
 ///////////////////////////////////////////////
 // Main Application
 ///////////////////////////////////////////////
 
-function log(message) {
-    post('Radiant Live: ' + message + '\n');
+function RadiantLive() {
+    this.name = 'Radiant Live';
 }
 
-function cb(args) {
-    if (!radiantLiveEnabled) {
-        return;
+RadiantLive.prototype._log = function (message) {
+    post(this.name + ': ' + message + '\n');
+};
+
+RadiantLive.prototype._getLiveApi = function (path) {
+    if (!this.liveApi) {
+        this.liveApi = new LiveAPI(null, path);
+    } else {
+        this.liveApi.path = path;
     }
 
-    if (args[0] === 'playing_slot_index') {
-        var state = parseInt(args[1], 10);
+    return this.liveApi;
+};
 
-        if (state >= 0) {
-            var slots = this.get('clip_slots');
-            var trackColor = this.get('color');
-            var id = this.path.replace(/['"]+/g, '') + ' clip_slots ' + state + ' clip'; //'
-            outlet(0, trackColor, id);
-        }
-    }
-}
+RadiantLive.prototype._getTrackInformation = function (trackPath) {
+    var liveApi = this._getLiveApi(trackPath);
+    var trackPath = liveApi.path;
+    var trackColor = liveApi.get('color');
+    var trackName = liveApi.get('name').toString();
+    var clipSlotCount = liveApi.getcount('clip_slots');
 
-function processTrack(liveAPI) {
-    // liveAPI continues to get reused with the path changing; be sure to manage that state
-    var trackPath = liveAPI.path;
-    var trackColor = liveAPI.get('color');
-    var trackName = liveAPI.get('name');
-    var clipSlotCount = liveAPI.getcount('clip_slots');
+    return {
+        trackPath: trackPath,
+        trackColor: trackColor,
+        trackName: trackName,
+        clipSlotCount: clipSlotCount
+    };
+};
 
-    log('Processing Track ' + trackName);
+RadiantLive.prototype._getClipSlotInformation = function (clipSlotPath) {
+    var liveApi = this._getLiveApi(clipSlotPath);
+    var hasClipRaw = liveApi.get('has_clip')
+    var hasClip = parseInt(hasClipRaw, 10);
 
-    for (var j = 0; j < clipSlotCount; j++) {
-        var clipSlotPath = trackPath.replace(/['"]+/g, '') + ' clip_slots ' + j; //'
-        liveAPI.path = clipSlotPath;
-        var hasClipRaw = liveAPI.get('has_clip');
-        
-        var hasClip = parseInt(hasClipRaw, 10);
+    return {
+        hasClip: hasClip === 1
+    };
+};
 
-        if (hasClip === 1) {
+RadiantLive.prototype._processTrack = function (track) {
+    this._log('Processing Track ' + track.trackName);
+
+    for (var j = 0; j < track.clipSlotCount; j++) {
+        var clipSlotPath = track.trackPath.replace(/['"]+/g, '') + ' clip_slots ' + j; //'
+        var clipSlot = this._getClipSlotInformation(clipSlotPath);
+
+        if (clipSlot.hasClip) {
             var clipPath = clipSlotPath + ' clip';
-            liveAPI.path = clipPath;
-            liveAPI.set('color', trackColor);
+            var clipApi = this._getLiveApi(clipPath);
 
-            if (trackName.indexOf('Click Track', 0) === -1) {
-                liveAPI.set('name', trackName);
+            clipApi.set('color', track.trackColor);
+
+            if (track.trackName.indexOf('Click Track', 0) === -1) {
+                if (track.trackName.indexOf('OUT-') > 0) {
+                    var output = track.trackName.replace(/[A-z\-]+/g, '');
+                    this._log('Group encountered. Setting output to ' + output + '.');
+                }
+
+                clipApi.set('name', track.trackName);
             } else {
-                var clipName = liveAPI.get('name');
+                var clipName = clipApi.get('name');
+
                 var scenePath = 'live_set scenes ' + j;
-                liveAPI.path = scenePath;
-                liveAPI.set('name', clipName);
+                var sceneApi = this._getLiveApi(scenePath);
+                sceneApi.set('name', clipName);
             }
         }
     }
-}
+};
 
-function processTracksAndClips() {
-    log('Starting to Process Tracks and Clips.')
+RadiantLive.prototype.processTracksAndClips = function () {
+    this._log('Starting to Process Tracks and Clips.')
 
-    var liveAPI = new LiveAPI(null, 'live_set');
-    var trackCount = liveAPI.getcount('tracks');
+    var liveApi = this._getLiveApi('live_set');
+    var trackCount = liveApi.getcount('tracks');
 
     for (var i = 0; i < trackCount; i++) {
-        log('Processing Track #' + (i + 1));
-        liveAPI.path = 'live_set tracks ' + i;
-        processTrack(liveAPI);
+        var trackPath = 'live_set tracks ' + i;
+        var track = this._getTrackInformation(trackPath);
+
+        this._processTrack(track);
     }
+};
+
+// Main entry point into the application
+function process() {
+    var radiantLive = new RadiantLive();
+    radiantLive.processTracksAndClips();
 }
