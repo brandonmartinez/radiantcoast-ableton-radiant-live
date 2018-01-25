@@ -1,6 +1,25 @@
+///////////////////////////////////////////////
+// Radiant Live
+///////////////////////////////////////////////
+// Main JavaScript methods to process the
+// Ableton Live set
+///////////////////////////////////////////////
+
+
+///////////////////////////////////////////////
+// Global Setup
+///////////////////////////////////////////////
+
+// Number of I/O
 outlets = 1;
 
-var radiantLiveEnabled = false;
+// Global Variables to Expose
+var radiantLiveEnabled = true;
+
+
+///////////////////////////////////////////////
+// Main Application
+///////////////////////////////////////////////
 
 function log(message) {
     post('Radiant Live: ' + message + '\n');
@@ -57,11 +76,6 @@ function processTrack(liveAPI) {
 }
 
 function processTracksAndClips() {
-    if (!radiantLiveEnabled) {
-        log('Not Enabled!');
-        return;
-    }
-
     log('Starting to Process Tracks and Clips.')
 
     var liveAPI = new LiveAPI(null, 'live_set');
@@ -72,12 +86,4 @@ function processTracksAndClips() {
         liveAPI.path = 'live_set tracks ' + i;
         processTrack(liveAPI);
     }
-}
-
-function bang() {
-    
-}
-
-function msg_int(i) {
-    radiantLiveEnabled = (i === 1);
 }
