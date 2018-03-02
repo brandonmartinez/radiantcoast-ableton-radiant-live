@@ -73,19 +73,25 @@ RadiantLive.prototype._processTrack = function (track) {
 
             clipApi.set('color', track.trackColor);
 
-            if (track.trackName.indexOf('Click Track', 0) === -1) {
-                if (track.trackName.indexOf('OUT-') > 0) {
-                    var output = track.trackName.replace(/[A-z\-]+/g, '');
-                    this._log('Group encountered. Setting output to ' + output + '.');
-                }
+            var isClickTrack = track.trackName.indexOf('Click Track', 0) >= 0;
+            var isControlTrack = track.trackName.indexOf('CONTROL', 0) >= 0;
 
-                clipApi.set('name', track.trackName);
-            } else {
+            if(isClickTrack) {
                 var clipName = clipApi.get('name');
 
                 var scenePath = 'live_set scenes ' + j;
                 var sceneApi = this._getLiveApi(scenePath);
                 sceneApi.set('name', clipName);
+            } else {
+                // We don't want to rename control scenes since they are descriptive
+                if(!isControlTrack) {
+                    if (track.trackName.indexOf('OUT-') > 0) {
+                        var output = track.trackName.replace(/[A-z\-]+/g, '');
+                        this._log('Group encountered. Setting output to ' + output + '.');
+                    }
+    
+                    clipApi.set('name', track.trackName);
+                }
             }
         }
     }
